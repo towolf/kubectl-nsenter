@@ -19,7 +19,7 @@ the PID namespace of the container.
 
 ## Installation
 
-Download, make exectuable and move to PATH.
+Download, make executable, and move to PATH.
 
 ## Usage
 
