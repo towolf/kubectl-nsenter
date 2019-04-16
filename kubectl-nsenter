@@ -1,0 +1,90 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+die() {
+    printf '%s\n' "$1" >&2
+    exit 1
+}
+
+pods=()
+namespace=default
+
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    -n|--namespace)
+      if [ "$2" ]; then
+        namespace=$2
+        shift
+      else
+        die '"--namespace" requires a non-empty option'
+      fi
+      ;;
+    --namespace=?*)
+      namespace=${1#*=}
+      ;;
+    --namespace=)
+      die '"--namespace" requires a non-empty option'
+      ;;
+    -c|--container)
+      if [ "$2" ]; then
+        container_name=$2
+        shift
+      else
+        die '"--container" requires a non-empty option'
+      fi
+      ;;
+    --container=?*)
+      container_name=${1#*=}
+      ;;
+    --container=)
+      die '"--container" requires a non-empty option'
+      ;;
+    -h|--help)
+      HELP_TEXT="$(cat <<-EOF
+			SSH into Kubernetes nodes and nsenter into network namespace of a pod
+
+			Example:
+
+			  kubectl nsenter -n goe-dev api-dev-6d94fd5c98-xqdv5 -c php
+
+			Options:
+
+			  -n, --namespace='': Namespace of the pod
+			  -c, --container='': Name of container of a pod
+			EOF
+      )"
+
+      die "$HELP_TEXT"
+      ;;
+
+        # handle unknown arguments as positional and save for later use
+        *)
+        pods+=("$1")
+        ;;
+    esac
+
+    shift
+  done
+
+if [[ "${#pods[@]}" -ne 1 ]]; then
+  die "Error: kubectl nsenter needs one pod name as argument"
+fi
+
+pod="${pods[0]}"
+node=$(kubectl -n "$namespace" get pod "$pod" -o go-template --template='{{.spec.nodeName}}')
+
+if [[ -v container_name ]]; then
+  ssh -tt "$node" "
+    pod_id=\$(crictl pods --namespace $namespace --name $pod --state Ready --quiet)
+    container_id=\$(crictl ps -p \$pod_id --no-trunc --label io.kubernetes.container.name=$container_name -q)
+    target_pid=\$(crictl inspect \$container_id | jq .info.pid)
+    nsenter --target \$target_pid --uts --net --pid unshare --mount-proc bash
+  "
+else
+  echo "No container specified, calling nsenter on sandbox sleep container"
+  ssh -tt "$node" "
+    pod_id=\$(crictl pods --namespace $namespace --name $pod --state Ready --quiet)
+    target_pid=\$(crictl inspectp \$pod_id | jq .info.pid)
+    nsenter --target \$target_pid --uts --net bash
+  "
+fi
