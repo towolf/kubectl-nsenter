@@ -2,6 +2,8 @@
 
 _Simple kubectl plugin to take pod name, SSH onto node and spawn an nsenter shell._
 
+**:heavy_exclamation_mark: Since we use `crictl`, this plugin may only work with `containerd` and not with straight Docker ..**
+
 So, I made a quick plugin for kubectl that allows to enter the network namespace of the pod to run things like netstat, tcpdump, dig, _etc pp_
 
 The node (if it is a full-blown OS like Ubuntu 18.04) has all the debugging
