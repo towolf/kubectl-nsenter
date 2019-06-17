@@ -78,7 +78,7 @@ if [[ -v container_name ]]; then
     pod_id=\$(crictl pods --namespace $namespace --name $pod --state Ready --quiet)
     container_id=\$(crictl ps -p \$pod_id --no-trunc --label io.kubernetes.container.name=$container_name -q)
     target_pid=\$(crictl inspect \$container_id | jq .info.pid)
-    nsenter --target \$target_pid --uts --net --pid unshare --mount-proc bash
+    nsenter --target \$target_pid --uts --net --pid unshare --mount-proc sh -c \"cd /run/containerd/io.containerd.runtime.v1.linux/k8s.io/\$container_id/rootfs && exec bash\"
   "
 else
   echo "No container specified, calling nsenter on sandbox sleep container"
